@@ -14,7 +14,7 @@ A clean, customizable Tabata and interval training timer plugin for [KOReader](h
 - **Large E-Ink Display:** Extra-large countdown clock and high-contrast text visible from a distance.
 - **Total Workout Clock:** Shows total remaining workout time updated in real-time.
 - **Manual & Step Controls:** Starts in paused state; control workout flow with `▶ Start` / `⏸ Pause`, `⏮ Previous`, and `Next ⏭` buttons.
-- **Upcoming Exercises Preview:** Displays the next 4 scheduled exercises and count of remaining intervals.
+- **Upcoming Exercises Preview:** Displays the next 6 scheduled exercises and count of remaining intervals.
 - **Multiple Workout Routines & On-Device Editing:** Switch workouts anytime from the **Workouts** menu, and edit any workout's `.csv` file directly on your device using the built-in editor.
 
 ---

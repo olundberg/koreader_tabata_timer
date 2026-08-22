@@ -21,7 +21,6 @@ local Screen = Device.screen
 
 local Parser = require("parser")
 
-local CenterContainer = require("ui/widget/container/centercontainer")
 local TopContainer = require("ui/widget/container/topcontainer")
 local Geom = require("ui/geometry")
 
@@ -85,13 +84,16 @@ function TabataTimerWidget:buildLayout()
         face = Font:getFace("cfont", 22),
     }
 
+    local leadPadding = Screen:scaleBySize(10)
     local spacing1 = Screen:scaleBySize(6)
     local spacing2 = Screen:scaleBySize(8)
-    local usedWidth = self.closeButton:getSize().w + self.workoutsButton:getSize().w + self.workoutLabelWidget:getSize().w + spacing1 + spacing2
+    self.topBarLeadingSpan = HorizontalSpan:new{ width = leadPadding }
+    local usedWidth = leadPadding + self.closeButton:getSize().w + self.workoutsButton:getSize().w + self.workoutLabelWidget:getSize().w + spacing1 + spacing2
     self.topBarTrailingSpan = HorizontalSpan:new{ width = math.max(0, math.floor(self.width * 0.94) - usedWidth) }
 
     self.topBar = HorizontalGroup:new{
         align = "center",
+        self.topBarLeadingSpan,
         self.closeButton,
         HorizontalSpan:new{ width = spacing1 },
         self.workoutsButton,
@@ -102,7 +104,7 @@ function TabataTimerWidget:buildLayout()
 
     self.titleWidget = TextBoxWidget:new{
         text = string.format("Exercise %d/%d: %s", self.currentIndex, #self.exercises, currentEx.name),
-        face = Font:getFace("cfont", 36),
+        face = Font:getFace("cfont", 48),
         bold = true,
         alignment = "center",
         width = math.floor(self.width * 0.94),
@@ -110,18 +112,18 @@ function TabataTimerWidget:buildLayout()
 
     self.clockWidget = TextWidget:new{
         text = self:formatTime(self.timeLeft),
-        face = Font:getFace("cfont", 130),
+        face = Font:getFace("cfont", 170),
         bold = true,
     }
 
     self.totalClockWidget = TextWidget:new{
         text = "Total left: " .. self:formatTime(self:getTotalTimeLeft()),
-        face = Font:getFace("cfont", 26),
+        face = Font:getFace("cfont", 32),
     }
 
     local sampleUpcoming = TextBoxWidget:new{
-        text = "Upcoming exercises:\n • Line 1 (30s)\n • Line 2 (30s)\n • Line 3 (30s)\n • Line 4 (30s)\n • (+99 more exercises)\n",
-        face = Font:getFace("cfont", 26),
+        text = "Upcoming exercises:\n • Line 1 (30s)\n • Line 2 (30s)\n • Line 3 (30s)\n • Line 4 (30s)\n • Line 5 (30s)\n • Line 6 (30s)\n • (+99 more exercises)\n",
+        face = Font:getFace("cfont", 28),
         alignment = "center",
         width = math.floor(self.width * 0.94),
     }
@@ -130,7 +132,7 @@ function TabataTimerWidget:buildLayout()
 
     self.upcomingTextWidget = TextBoxWidget:new{
         text = self:getUpcomingText(),
-        face = Font:getFace("cfont", 26),
+        face = Font:getFace("cfont", 28),
         alignment = "center",
         width = math.floor(self.width * 0.94),
     }
@@ -143,15 +145,15 @@ function TabataTimerWidget:buildLayout()
     self.prevButton = Button:new{
         text = "⏮ Prev",
         text_font_face = "cfont",
-        text_font_size = 26,
+        text_font_size = 32,
         callback = function()
             self:onPrev()
         end,
     }
 
-    local sampleResume = Button:new{ text = "▶ Resume", text_font_face = "cfont", text_font_size = 26 }
-    local samplePause = Button:new{ text = "⏸ Pause", text_font_face = "cfont", text_font_size = 26 }
-    local sampleStart = Button:new{ text = "▶ Start", text_font_face = "cfont", text_font_size = 26 }
+    local sampleResume = Button:new{ text = "▶ Resume", text_font_face = "cfont", text_font_size = 32 }
+    local samplePause = Button:new{ text = "⏸ Pause", text_font_face = "cfont", text_font_size = 32 }
+    local sampleStart = Button:new{ text = "▶ Start", text_font_face = "cfont", text_font_size = 32 }
     self.playPauseButtonWidth = math.max(sampleResume:getSize().w, samplePause:getSize().w, sampleStart:getSize().w)
     sampleResume:free()
     samplePause:free()
@@ -160,7 +162,7 @@ function TabataTimerWidget:buildLayout()
     self.playPauseButton = Button:new{
         text = "▶ Start",
         text_font_face = "cfont",
-        text_font_size = 26,
+        text_font_size = 32,
         width = self.playPauseButtonWidth,
         callback = function()
             self:togglePlayPause()
@@ -170,7 +172,7 @@ function TabataTimerWidget:buildLayout()
     self.nextButton = Button:new{
         text = "Next ⏭",
         text_font_face = "cfont",
-        text_font_size = 26,
+        text_font_size = 32,
         callback = function()
             self:onNext()
         end,
@@ -185,33 +187,32 @@ function TabataTimerWidget:buildLayout()
         self.nextButton,
     }
 
-    self.topGroup = VerticalGroup:new{
+    self.topMarginSpan = VerticalSpan:new{ width = Screen:scaleBySize(8) }
+
+    self.middleGroup = VerticalGroup:new{
         align = "center",
-        self.topBar,
-        VerticalSpan:new{ width = Screen:scaleBySize(2) },
         self.titleWidget,
         VerticalSpan:new{ width = Screen:scaleBySize(2) },
         self.clockWidget,
         self.totalClockWidget,
+        VerticalSpan:new{ width = Screen:scaleBySize(6) },
+        self.navButtonGroup,
     }
 
-    self.bottomGroup = VerticalGroup:new{
-        align = "center",
-        VerticalSpan:new{ width = Screen:scaleBySize(4) },
-        self.navButtonGroup,
-        VerticalSpan:new{ width = Screen:scaleBySize(4) },
-        self.upcomingContainer,
-    }
+    local usedH = self.topMarginSpan.width + self.topBar:getSize().h + self.middleGroup:getSize().h + self.upcomingContainer:getSize().h
+    local remainingH = math.max(0, self.height - usedH)
+
+    self.space1Span = VerticalSpan:new{ width = math.max(Screen:scaleBySize(4), math.floor(remainingH * 0.35)) }
+    self.space2Span = VerticalSpan:new{ width = math.max(Screen:scaleBySize(6), math.floor(remainingH * 0.40)) }
 
     self.mainGroup = VerticalGroup:new{
         align = "center",
-        self.topGroup,
-        self.bottomGroup,
-    }
-
-    self.centerContainer = CenterContainer:new{
-        dimen = Geom:new{ x = 0, y = 0, w = self.width, h = self.height },
-        self.mainGroup,
+        self.topMarginSpan,
+        self.topBar,
+        self.space1Span,
+        self.middleGroup,
+        self.space2Span,
+        self.upcomingContainer,
     }
 
     self.frame = FrameContainer:new{
@@ -221,7 +222,7 @@ function TabataTimerWidget:buildLayout()
         bordersize = 0,
         margin = 0,
         padding = 0,
-        self.centerContainer,
+        self.mainGroup,
     }
 
     self[1] = self.frame
@@ -234,7 +235,7 @@ function TabataTimerWidget:getUpcomingText()
         local ex = self.exercises[i]
         text = text .. " • " .. ex.name .. " (" .. ex.seconds .. "s)\n"
         count = count + 1
-        if count >= 4 then
+        if count >= 6 then
             if #self.exercises > i then
                 text = text .. " • (+" .. (#self.exercises - i) .. " more exercises)\n"
             end
@@ -293,8 +294,7 @@ function TabataTimerWidget:updateDisplay()
     self.clockWidget:setText(self:formatTime(self.timeLeft))
     self.totalClockWidget:setText("Total left: " .. self:formatTime(self:getTotalTimeLeft()))
     self.upcomingTextWidget:setText(self:getUpcomingText())
-    self.topGroup:resetLayout()
-    self.bottomGroup:resetLayout()
+    self.middleGroup:resetLayout()
     self.mainGroup:resetLayout()
     UIManager:setDirty(self, "ui")
 end
@@ -499,13 +499,15 @@ function TabataTimerWidget:loadWorkout(filepath, display_name)
     self.currentIndex = 1
     self.timeLeft = self.exercises[self.currentIndex].seconds
 
+    local leadPadding = self.topBarLeadingSpan and self.topBarLeadingSpan.width or Screen:scaleBySize(10)
     local spacing1 = Screen:scaleBySize(6)
     local spacing2 = Screen:scaleBySize(8)
-    local usedWidth = self.closeButton:getSize().w + self.workoutsButton:getSize().w + self.workoutLabelWidget:getSize().w + spacing1 + spacing2
+    local usedWidth = leadPadding + self.closeButton:getSize().w + self.workoutsButton:getSize().w + self.workoutLabelWidget:getSize().w + spacing1 + spacing2
     self.topBarTrailingSpan.width = math.max(0, math.floor(self.width * 0.94) - usedWidth)
 
     self.topBar:resetLayout()
-    self.topGroup:resetLayout()
+    self.middleGroup:resetLayout()
+    self.mainGroup:resetLayout()
     self:updateDisplay()
 end
 
