@@ -22,6 +22,7 @@ local Screen = Device.screen
 local Parser = require("parser")
 
 local CenterContainer = require("ui/widget/container/centercontainer")
+local TopContainer = require("ui/widget/container/topcontainer")
 local Geom = require("ui/geometry")
 
 local TabataTimerWidget = InputContainer:extend{
@@ -101,7 +102,7 @@ function TabataTimerWidget:buildLayout()
 
     self.titleWidget = TextBoxWidget:new{
         text = string.format("Exercise %d/%d: %s", self.currentIndex, #self.exercises, currentEx.name),
-        face = Font:getFace("cfont", 48),
+        face = Font:getFace("cfont", 36),
         bold = true,
         alignment = "center",
         width = math.floor(self.width * 0.94),
@@ -109,34 +110,48 @@ function TabataTimerWidget:buildLayout()
 
     self.clockWidget = TextWidget:new{
         text = self:formatTime(self.timeLeft),
-        face = Font:getFace("cfont", 190),
+        face = Font:getFace("cfont", 130),
         bold = true,
     }
 
     self.totalClockWidget = TextWidget:new{
         text = "Total left: " .. self:formatTime(self:getTotalTimeLeft()),
-        face = Font:getFace("cfont", 32),
+        face = Font:getFace("cfont", 26),
     }
+
+    local sampleUpcoming = TextBoxWidget:new{
+        text = "Upcoming exercises:\n • Line 1 (30s)\n • Line 2 (30s)\n • Line 3 (30s)\n • Line 4 (30s)\n • (+99 more exercises)\n",
+        face = Font:getFace("cfont", 26),
+        alignment = "center",
+        width = math.floor(self.width * 0.94),
+    }
+    self.upcomingMaxH = sampleUpcoming:getSize().h
+    sampleUpcoming:free()
 
     self.upcomingTextWidget = TextBoxWidget:new{
         text = self:getUpcomingText(),
-        face = Font:getFace("cfont", 32),
+        face = Font:getFace("cfont", 26),
         alignment = "center",
         width = math.floor(self.width * 0.94),
+    }
+
+    self.upcomingContainer = TopContainer:new{
+        dimen = Geom:new{ x = 0, y = 0, w = math.floor(self.width * 0.94), h = self.upcomingMaxH },
+        self.upcomingTextWidget,
     }
 
     self.prevButton = Button:new{
         text = "⏮ Prev",
         text_font_face = "cfont",
-        text_font_size = 28,
+        text_font_size = 26,
         callback = function()
             self:onPrev()
         end,
     }
 
-    local sampleResume = Button:new{ text = "▶ Resume", text_font_face = "cfont", text_font_size = 28 }
-    local samplePause = Button:new{ text = "⏸ Pause", text_font_face = "cfont", text_font_size = 28 }
-    local sampleStart = Button:new{ text = "▶ Start", text_font_face = "cfont", text_font_size = 28 }
+    local sampleResume = Button:new{ text = "▶ Resume", text_font_face = "cfont", text_font_size = 26 }
+    local samplePause = Button:new{ text = "⏸ Pause", text_font_face = "cfont", text_font_size = 26 }
+    local sampleStart = Button:new{ text = "▶ Start", text_font_face = "cfont", text_font_size = 26 }
     self.playPauseButtonWidth = math.max(sampleResume:getSize().w, samplePause:getSize().w, sampleStart:getSize().w)
     sampleResume:free()
     samplePause:free()
@@ -145,7 +160,7 @@ function TabataTimerWidget:buildLayout()
     self.playPauseButton = Button:new{
         text = "▶ Start",
         text_font_face = "cfont",
-        text_font_size = 28,
+        text_font_size = 26,
         width = self.playPauseButtonWidth,
         callback = function()
             self:togglePlayPause()
@@ -155,7 +170,7 @@ function TabataTimerWidget:buildLayout()
     self.nextButton = Button:new{
         text = "Next ⏭",
         text_font_face = "cfont",
-        text_font_size = 28,
+        text_font_size = 26,
         callback = function()
             self:onNext()
         end,
@@ -185,7 +200,7 @@ function TabataTimerWidget:buildLayout()
         VerticalSpan:new{ width = Screen:scaleBySize(4) },
         self.navButtonGroup,
         VerticalSpan:new{ width = Screen:scaleBySize(4) },
-        self.upcomingTextWidget,
+        self.upcomingContainer,
     }
 
     self.mainGroup = VerticalGroup:new{
