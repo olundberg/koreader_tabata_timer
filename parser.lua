@@ -1,17 +1,17 @@
 local Parser = {}
 
 function Parser.readCSV(filepath)
-    -- Om ingen sökväg skickas med, leta i samma mapp som parser.lua ligger i
+    -- If no filepath is passed, default to workouts/tabata.csv relative to parser.lua
     if not filepath then
         local str = debug.getinfo(1, "S").source:match("@(.+)")
         local dir = str and str:match("(.*/)") or "./"
-        filepath = dir .. "tabata.csv"
+        filepath = dir .. "workouts/tabata.csv"
     end
     
     local workouts = {}
     local file, err = io.open(filepath, "r")
     if not file then
-        return nil, "Kunde inte hitta eller öppna filen: " .. tostring(filepath) .. " (" .. tostring(err) .. ")"
+        return nil, "Could not find or open file: " .. tostring(filepath) .. " (" .. tostring(err) .. ")"
     end
     
     for line in file:lines() do

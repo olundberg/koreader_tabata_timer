@@ -140,5 +140,5 @@ lua tests/test_parser.lua
 
 ## License
 
-MIT License.
+This project is licensed under the [GNU Affero General Public License v3.0 (AGPL-3.0)](LICENSE) - see the [LICENSE](LICENSE) file for details.
 
