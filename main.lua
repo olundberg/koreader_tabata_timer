@@ -103,7 +103,7 @@ function TabataTimerWidget:buildLayout()
     }
 
     self.titleWidget = TextBoxWidget:new{
-        text = string.format("Exercise %d/%d: %s", self.currentIndex, #self.exercises, currentEx.name),
+        text = string.format("(%d/%d) %s", self.currentIndex, #self.exercises, currentEx.name),
         face = Font:getFace("cfont", 48),
         bold = true,
         alignment = "center",
@@ -122,7 +122,7 @@ function TabataTimerWidget:buildLayout()
     }
 
     local sampleUpcoming = TextBoxWidget:new{
-        text = "Upcoming exercises:\n • Line 1 (30s)\n • Line 2 (30s)\n • Line 3 (30s)\n • Line 4 (30s)\n • Line 5 (30s)\n • Line 6 (30s)\n • (+99 more exercises)\n",
+        text = "Upcoming exercises:\n 99. Line 1 (30s)\n 99. Line 2 (30s)\n 99. Line 3 (30s)\n 99. Line 4 (30s)\n 99. Line 5 (30s)\n 99. Line 6 (30s)\n (+99 more exercises)\n",
         face = Font:getFace("cfont", 28),
         alignment = "center",
         width = math.floor(self.width * 0.94),
@@ -233,17 +233,17 @@ function TabataTimerWidget:getUpcomingText()
     local count = 0
     for i = self.currentIndex + 1, #self.exercises do
         local ex = self.exercises[i]
-        text = text .. " • " .. ex.name .. " (" .. ex.seconds .. "s)\n"
+        text = text .. " " .. i .. ". " .. ex.name .. " (" .. ex.seconds .. "s)\n"
         count = count + 1
         if count >= 6 then
             if #self.exercises > i then
-                text = text .. " • (+" .. (#self.exercises - i) .. " more exercises)\n"
+                text = text .. " (+" .. (#self.exercises - i) .. " more exercises)\n"
             end
             break
         end
     end
     if count == 0 then
-        text = text .. " • (Last exercise!)"
+        text = text .. " (Last exercise!)"
     end
     return text
 end
@@ -289,7 +289,7 @@ function TabataTimerWidget:updateDisplay()
     if not self.running then return end
     local currentEx = self.exercises[self.currentIndex]
     if currentEx then
-        self.titleWidget:setText(string.format("Exercise %d/%d: %s", self.currentIndex, #self.exercises, currentEx.name))
+        self.titleWidget:setText(string.format("(%d/%d) %s", self.currentIndex, #self.exercises, currentEx.name))
     end
     self.clockWidget:setText(self:formatTime(self.timeLeft))
     self.totalClockWidget:setText("Total left: " .. self:formatTime(self:getTotalTimeLeft()))
