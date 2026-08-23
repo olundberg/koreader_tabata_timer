@@ -348,8 +348,15 @@ end
 function TabataTimerWidget:showWorkoutsDialog()
     local files = self:getAvailableWorkouts()
 
+    local sampleEdit = Button:new{ text = "✏ Edit" }
+    local sampleRename = Button:new{ text = _("Rename") }
+    local edit_width = sampleEdit:getSize().w + Screen:scaleBySize(8)
+    local rename_width = sampleRename:getSize().w + Screen:scaleBySize(8)
+    sampleEdit:free()
+    sampleRename:free()
+
     local buttons = {}
-    for _, file in ipairs(files) do
+    for i, file in ipairs(files) do
         local display_name = file:gsub("%.[cC][sS][vV]$", "")
         local filepath = self.workouts_dir .. "/" .. file
         table.insert(buttons, {
@@ -365,12 +372,24 @@ function TabataTimerWidget:showWorkoutsDialog()
             },
             {
                 text = "✏ Edit",
+                width = edit_width,
                 callback = function()
                     if self.workout_dialog then
                         UIManager:close(self.workout_dialog)
                         self.workout_dialog = nil
                     end
                     self:editWorkout(filepath, display_name)
+                end,
+            },
+            {
+                text = _("Rename"),
+                width = rename_width,
+                callback = function()
+                    if self.workout_dialog then
+                        UIManager:close(self.workout_dialog)
+                        self.workout_dialog = nil
+                    end
+                    self:renameWorkout(filepath, display_name)
                 end,
             },
         })
@@ -404,6 +423,94 @@ function TabataTimerWidget:showWorkoutsDialog()
         buttons = buttons,
     }
     UIManager:show(self.workout_dialog)
+end
+
+function TabataTimerWidget:renameWorkout(filepath, old_display_name)
+    local rename_dialog
+    rename_dialog = InputDialog:new{
+        title = _("Rename Workout"),
+        input = old_display_name,
+        input_hint = _("e.g. hiit"),
+        description = string.format(_("Enter new name for '%s':"), old_display_name),
+        buttons = {
+            {
+                {
+                    text = _("Cancel"),
+                    id = "close",
+                    callback = function()
+                        UIManager:close(rename_dialog)
+                        self.rename_dialog = nil
+                        self:showWorkoutsDialog()
+                    end,
+                },
+                {
+                    text = _("Rename"),
+                    is_enter_default = true,
+                    callback = function()
+                        local raw_name = rename_dialog:getInputText() or ""
+                        local clean_name = raw_name:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%.[cC][sS][vV]$", "")
+                        clean_name = clean_name:gsub("[\\/]", "")
+                        if clean_name == "" then
+                            UIManager:show(InfoMessage:new{
+                                text = _("Please enter a valid workout name."),
+                            })
+                            return
+                        end
+
+                        UIManager:close(rename_dialog)
+                        self.rename_dialog = nil
+
+                        if clean_name == old_display_name then
+                            self:showWorkoutsDialog()
+                            return
+                        end
+
+                        local new_filepath = self.workouts_dir .. "/" .. clean_name .. ".csv"
+                        local exists = util.readFromFile(new_filepath, "rb")
+                        if exists and exists ~= "" then
+                            UIManager:show(InfoMessage:new{
+                                text = string.format(_("A workout named '%s' already exists."), clean_name),
+                            })
+                            self:showWorkoutsDialog()
+                            return
+                        end
+
+                        local ok, err = os.rename(filepath, new_filepath)
+                        if not ok then
+                            UIManager:show(InfoMessage:new{
+                                text = string.format(_("Failed to rename file:\n%s"), tostring(err)),
+                            })
+                            self:showWorkoutsDialog()
+                            return
+                        end
+
+                        if self.currentWorkoutName == old_display_name then
+                            self.currentWorkoutName = clean_name
+                            self.workoutLabelWidget:setText("(" .. self.currentWorkoutName .. ")")
+                            local leadPadding = self.topBarLeadingSpan and self.topBarLeadingSpan.width or Screen:scaleBySize(10)
+                            local spacing1 = Screen:scaleBySize(6)
+                            local spacing2 = Screen:scaleBySize(8)
+                            local usedWidth = leadPadding + self.closeButton:getSize().w + self.workoutsButton:getSize().w + self.workoutLabelWidget:getSize().w + spacing1 + spacing2
+                            self.topBarTrailingSpan.width = math.max(0, math.floor(self.width * 0.94) - usedWidth)
+                            self.topBar:resetLayout()
+                            self.middleGroup:resetLayout()
+                            self.mainGroup:resetLayout()
+                            UIManager:setDirty(self, "ui")
+                        end
+
+                        UIManager:show(InfoMessage:new{
+                            text = string.format(_("Renamed to '%s'"), clean_name),
+                            timeout = 2,
+                        })
+                        self:showWorkoutsDialog()
+                    end,
+                },
+            }
+        },
+    }
+    self.rename_dialog = rename_dialog
+    UIManager:show(rename_dialog)
+    rename_dialog:onShowKeyboard()
 end
 
 function TabataTimerWidget:newWorkout()
@@ -525,6 +632,10 @@ function TabataTimerWidget:onClose()
     if self.name_dialog then
         UIManager:close(self.name_dialog)
         self.name_dialog = nil
+    end
+    if self.rename_dialog then
+        UIManager:close(self.rename_dialog)
+        self.rename_dialog = nil
     end
     UIManager:close(self, "ui")
     return true
