@@ -124,7 +124,7 @@ Squats,45
 Rest,15
 ```
 
-Empty lines and lines starting with `#` are ignored.
+Empty lines, full-line comments (starting with `#`), and inline comments (e.g., `Plank,30 # warmup`) are supported and ignored by the timer parser.
 
 ---
 

@@ -15,6 +15,8 @@ function Parser.readCSV(filepath)
     end
     
     for line in file:lines() do
+        -- Strip inline comments starting with '#'
+        line = line:gsub("%s*#.*$", "")
         line = line:gsub("^%s*(.-)%s*$", "%1")
         if line ~= "" then
             local exercise, seconds = line:match("^([^,]+),%s*(%d+)$")

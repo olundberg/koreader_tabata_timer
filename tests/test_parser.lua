@@ -17,7 +17,7 @@ assert(#example_workouts > 0, "Test failed: example.csv is empty")
 -- Test reading a CSV with blank lines, comments, and whitespace
 local tmp_path = "workouts/test_blank_lines_temp.csv"
 local tmp_file = io.open(tmp_path, "w")
-tmp_file:write("\n\n# Header comment\nPlank, 30\n   \n\t\nRest, 10\n\n\nPush-ups,45\n\n")
+tmp_file:write("\n\n# Header comment\nPlank, 30 # first interval\n   \n\t\nRest, 10    # 10 second rest\n\n\nPush-ups,45 # pushing hard\n\n")
 tmp_file:close()
 
 local blank_test_workouts, blank_test_err = Parser.readCSV(tmp_path)
