@@ -20,6 +20,7 @@ local _ = require("gettext")
 local Screen = Device.screen
 
 local Parser = require("parser")
+local Updater = require("updater")
 
 local TopContainer = require("ui/widget/container/topcontainer")
 local Geom = require("ui/geometry")
@@ -33,6 +34,7 @@ function TabataTimerWidget:init()
     self.width = Screen:getWidth()
     self.height = Screen:getHeight()
     self.dimen = Geom:new{ x = 0, y = 0, w = self.width, h = self.height }
+    self.plugin_path = self.plugin_path or (self.workouts_dir and self.workouts_dir:gsub("/workouts$", "")) or "."
     self.workouts_dir = self.workouts_dir or (self.plugin_path and (self.plugin_path .. "/workouts")) or "workouts"
     self.currentWorkoutName = self.currentWorkoutName or "tabata"
     self.exercises = self.exercises or { { name = "No exercises", seconds = 0 } }
@@ -408,6 +410,20 @@ function TabataTimerWidget:showWorkoutsDialog()
     })
     table.insert(buttons, {
         {
+            text = _("Check for updates"),
+            callback = function()
+                if self.workout_dialog then
+                    UIManager:close(self.workout_dialog)
+                    self.workout_dialog = nil
+                end
+                Updater.checkAndUpdate(self.plugin_path, function()
+                    self:showWorkoutsDialog()
+                end)
+            end,
+        }
+    })
+    table.insert(buttons, {
+        {
             text = _("Cancel"),
             callback = function()
                 if self.workout_dialog then
@@ -693,6 +709,13 @@ function TabataTimerPlugin:addToMainMenu(menu_items)
                         plugin_path = self.path,
                     }
                     UIManager:show(timerWidget, "ui")
+                end,
+            },
+            {
+                text = _("Check for updates..."),
+                callback = function()
+                    local plugin_path = self.path or "."
+                    Updater.checkAndUpdate(plugin_path)
                 end,
             },
         },

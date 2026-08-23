@@ -16,6 +16,7 @@ A clean, customizable Tabata and interval training timer plugin for [KOReader](h
 - **Manual & Step Controls:** Starts in paused state; control workout flow with `▶ Start` / `⏸ Pause`, `⏮ Previous`, and `Next ⏭` buttons.
 - **Upcoming Exercises Preview:** Displays the next 6 scheduled exercises and count of remaining intervals.
 - **Multiple Workout Routines, On-Device Editing & Renaming:** Switch workouts anytime from the **Workouts** menu, rename routines (updating `.csv` files automatically), and edit any workout's `.csv` file directly on your device using the built-in editor.
+- **Over-The-Air (Wi-Fi) Updates:** Check for updates directly from GitHub over Wi-Fi with intelligent workout conflict resolution (keep local version, overwrite, or save as `.new.csv`).
 
 ---
 
