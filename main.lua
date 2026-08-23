@@ -103,8 +103,8 @@ function TabataTimerWidget:buildLayout()
     }
 
     self.titleWidget = TextBoxWidget:new{
-        text = string.format("(%d/%d) %s", self.currentIndex, #self.exercises, currentEx.name),
-        face = Font:getFace("cfont", 48),
+        text = string.format("(%d/%d)\n%s", self.currentIndex, #self.exercises, currentEx.name),
+        face = Font:getFace("cfont", 44),
         bold = true,
         alignment = "center",
         width = math.floor(self.width * 0.94),
@@ -112,18 +112,18 @@ function TabataTimerWidget:buildLayout()
 
     self.clockWidget = TextWidget:new{
         text = self:formatTime(self.timeLeft),
-        face = Font:getFace("cfont", 170),
+        face = Font:getFace("cfont", 155),
         bold = true,
     }
 
     self.totalClockWidget = TextWidget:new{
         text = "Total left: " .. self:formatTime(self:getTotalTimeLeft()),
-        face = Font:getFace("cfont", 32),
+        face = Font:getFace("cfont", 30),
     }
 
     local sampleUpcoming = TextBoxWidget:new{
         text = "Upcoming exercises:\n 99. Line 1 (30s)\n 99. Line 2 (30s)\n 99. Line 3 (30s)\n 99. Line 4 (30s)\n 99. Line 5 (30s)\n 99. Line 6 (30s)\n (+99 more exercises)\n",
-        face = Font:getFace("cfont", 28),
+        face = Font:getFace("cfont", 26),
         alignment = "center",
         width = math.floor(self.width * 0.94),
     }
@@ -132,7 +132,7 @@ function TabataTimerWidget:buildLayout()
 
     self.upcomingTextWidget = TextBoxWidget:new{
         text = self:getUpcomingText(),
-        face = Font:getFace("cfont", 28),
+        face = Font:getFace("cfont", 26),
         alignment = "center",
         width = math.floor(self.width * 0.94),
     }
@@ -145,15 +145,15 @@ function TabataTimerWidget:buildLayout()
     self.prevButton = Button:new{
         text = "⏮ Prev",
         text_font_face = "cfont",
-        text_font_size = 32,
+        text_font_size = 30,
         callback = function()
             self:onPrev()
         end,
     }
 
-    local sampleResume = Button:new{ text = "▶ Resume", text_font_face = "cfont", text_font_size = 32 }
-    local samplePause = Button:new{ text = "⏸ Pause", text_font_face = "cfont", text_font_size = 32 }
-    local sampleStart = Button:new{ text = "▶ Start", text_font_face = "cfont", text_font_size = 32 }
+    local sampleResume = Button:new{ text = "▶ Resume", text_font_face = "cfont", text_font_size = 30 }
+    local samplePause = Button:new{ text = "⏸ Pause", text_font_face = "cfont", text_font_size = 30 }
+    local sampleStart = Button:new{ text = "▶ Start", text_font_face = "cfont", text_font_size = 30 }
     self.playPauseButtonWidth = math.max(sampleResume:getSize().w, samplePause:getSize().w, sampleStart:getSize().w)
     sampleResume:free()
     samplePause:free()
@@ -162,7 +162,7 @@ function TabataTimerWidget:buildLayout()
     self.playPauseButton = Button:new{
         text = "▶ Start",
         text_font_face = "cfont",
-        text_font_size = 32,
+        text_font_size = 30,
         width = self.playPauseButtonWidth,
         callback = function()
             self:togglePlayPause()
@@ -172,7 +172,7 @@ function TabataTimerWidget:buildLayout()
     self.nextButton = Button:new{
         text = "Next ⏭",
         text_font_face = "cfont",
-        text_font_size = 32,
+        text_font_size = 30,
         callback = function()
             self:onNext()
         end,
@@ -187,7 +187,7 @@ function TabataTimerWidget:buildLayout()
         self.nextButton,
     }
 
-    self.topMarginSpan = VerticalSpan:new{ width = Screen:scaleBySize(8) }
+    self.topMarginSpan = VerticalSpan:new{ width = Screen:scaleBySize(4) }
 
     self.middleGroup = VerticalGroup:new{
         align = "center",
@@ -195,15 +195,15 @@ function TabataTimerWidget:buildLayout()
         VerticalSpan:new{ width = Screen:scaleBySize(2) },
         self.clockWidget,
         self.totalClockWidget,
-        VerticalSpan:new{ width = Screen:scaleBySize(6) },
+        VerticalSpan:new{ width = Screen:scaleBySize(4) },
         self.navButtonGroup,
     }
 
     local usedH = self.topMarginSpan.width + self.topBar:getSize().h + self.middleGroup:getSize().h + self.upcomingContainer:getSize().h
     local remainingH = math.max(0, self.height - usedH)
 
-    self.space1Span = VerticalSpan:new{ width = math.max(Screen:scaleBySize(4), math.floor(remainingH * 0.35)) }
-    self.space2Span = VerticalSpan:new{ width = math.max(Screen:scaleBySize(6), math.floor(remainingH * 0.40)) }
+    self.space1Span = VerticalSpan:new{ width = math.max(Screen:scaleBySize(2), math.floor(remainingH * 0.35)) }
+    self.space2Span = VerticalSpan:new{ width = math.max(Screen:scaleBySize(4), math.floor(remainingH * 0.40)) }
 
     self.mainGroup = VerticalGroup:new{
         align = "center",
@@ -289,7 +289,7 @@ function TabataTimerWidget:updateDisplay()
     if not self.running then return end
     local currentEx = self.exercises[self.currentIndex]
     if currentEx then
-        self.titleWidget:setText(string.format("(%d/%d) %s", self.currentIndex, #self.exercises, currentEx.name))
+        self.titleWidget:setText(string.format("(%d/%d)\n%s", self.currentIndex, #self.exercises, currentEx.name))
     end
     self.clockWidget:setText(self:formatTime(self.timeLeft))
     self.totalClockWidget:setText("Total left: " .. self:formatTime(self:getTotalTimeLeft()))
