@@ -5,7 +5,14 @@ function Parser.readCSV(filepath)
     if not filepath then
         local str = debug.getinfo(1, "S").source:match("@(.+)")
         local dir = str and str:match("(.*/)") or "./"
-        filepath = dir .. "workouts/tabata.csv"
+        local candidate = dir .. "workouts/tabata.csv"
+        local f = io.open(candidate, "r")
+        if f then
+            f:close()
+            filepath = candidate
+        else
+            filepath = dir .. "../workouts/tabata.csv"
+        end
     end
     
     local workouts = {}

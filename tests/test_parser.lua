@@ -1,3 +1,4 @@
+package.path = "lua/?.lua;" .. package.path
 local Parser = require("parser")
 
 print("Running unit tests for Tabata parser...")

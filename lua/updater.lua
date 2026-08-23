@@ -72,7 +72,7 @@ function Updater.checkAndUpdate(plugin_path, on_finish)
 
         for _, item in ipairs(data.tree) do
             if item.type == "blob" then
-                if item.path == "main.lua" or item.path == "parser.lua" or item.path == "_meta.lua" or item.path == "updater.lua" then
+                if item.path == "main.lua" or item.path == "_meta.lua" or item.path:match("^lua/.*%.lua$") or item.path == "parser.lua" or item.path == "updater.lua" then
                     table.insert(core_files, item.path)
                 elseif item.path:match("^workouts/[^/]+%.[cC][sS][vV]$") then
                     local filename = item.path:match("^workouts/(.+)$")
@@ -123,6 +123,10 @@ function Updater.performDownload(plugin_path, remote_tree_sha, core_files, remot
         local code, content = Updater.fetch(rawBase .. path)
         if code == 200 and content and content ~= "" then
             local target_path = plugin_path .. "/" .. path
+            local parent_dir = target_path:match("(.+)/[^/]+$")
+            if parent_dir and util.makePath then
+                util.makePath(parent_dir)
+            end
             util.writeToFile(content, target_path)
         end
     end
