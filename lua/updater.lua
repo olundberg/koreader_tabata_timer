@@ -1,14 +1,18 @@
-local ButtonDialog = require("ui/widget/buttondialog")
-local ConfirmBox = require("ui/widget/confirmbox")
-local InfoMessage = require("ui/widget/infomessage")
-local JSON = require("json")
-local NetworkMgr = require("ui/network/manager")
-local UIManager = require("ui/uimanager")
-local https = require("ssl.https")
-local ltn12 = require("ltn12")
-local socketutil = require("socketutil")
-local util = require("util")
-local _ = require("gettext")
+-- ============================================================================
+-- KOReader Tabata Timer - Over-The-Air (OTA) GitHub Updater
+-- ============================================================================
+
+local ButtonDialog = require("ui/widget/buttondialog")     -- Modal dialog for conflict resolution
+local ConfirmBox = require("ui/widget/confirmbox")         -- Confirmation dialog with OK / Cancel
+local InfoMessage = require("ui/widget/infomessage")       -- Toast notification
+local JSON = require("json")                               -- JSON decoder for GitHub API responses
+local NetworkMgr = require("ui/network/manager")           -- Wi-Fi and network connectivity manager
+local UIManager = require("ui/uimanager")                   -- Window manager and main loop
+local https = require("ssl.https")                         -- LuaSec HTTPS client
+local ltn12 = require("ltn12")                             -- LTN12 sink / filter pipeline
+local socketutil = require("socketutil")                   -- Network socket timeout helper
+local util = require("util")                               -- File I/O and helper functions
+local _ = require("gettext")                               -- Localization / translation function
 
 local Updater = {
     REPO_OWNER = "olundberg",
@@ -16,6 +20,7 @@ local Updater = {
     BRANCH = "main",
 }
 
+-- Performs a synchronous HTTPS GET request with User-Agent and JSON headers
 function Updater.fetch(url)
     local resp = {}
     socketutil:set_timeout(10, 25)
@@ -84,13 +89,20 @@ function Updater.checkAndUpdate(plugin_path, on_finish)
             end
         end
 
-        -- Check if anything is new/modified or if versions differ
+        -- Check if current version matches remote commit SHA
         if local_version == remote_tree_sha and local_version ~= "" then
-            UIManager:show(InfoMessage:new{
-                text = _("Tabata Timer is already up to date!"),
-                timeout = 3,
+            UIManager:show(ConfirmBox:new{
+                text = string.format(_("Tabata Timer is up to date (version %s).\n\nDo you want to force reinstall/re-download?"),
+                    local_version:sub(1, 7)),
+                ok_text = _("Reinstall"),
+                cancel_text = _("OK"),
+                ok_callback = function()
+                    Updater.performDownload(plugin_path, remote_tree_sha, core_files, remote_workouts, on_finish)
+                end,
+                cancel_callback = function()
+                    if on_finish then on_finish(false) end
+                end,
             })
-            if on_finish then on_finish(false) end
             return
         end
 
@@ -115,10 +127,11 @@ function Updater.performDownload(plugin_path, remote_tree_sha, core_files, remot
     }
     UIManager:show(progress_info)
 
+    -- Fetch files using the specific commit SHA to avoid Fastly CDN 5-minute edge caching on branch references
     local rawBase = string.format("https://raw.githubusercontent.com/%s/%s/%s/",
-        Updater.REPO_OWNER, Updater.REPO_NAME, Updater.BRANCH)
+        Updater.REPO_OWNER, Updater.REPO_NAME, remote_tree_sha or Updater.BRANCH)
 
-    -- 1. Download core files
+    -- 1. Download core plugin files
     for _, path in ipairs(core_files) do
         local code, content = Updater.fetch(rawBase .. path)
         if code == 200 and content and content ~= "" then
