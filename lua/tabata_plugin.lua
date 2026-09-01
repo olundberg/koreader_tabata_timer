@@ -1,57 +1,77 @@
-local Blitbuffer = require("ffi/blitbuffer")
-local Button = require("ui/widget/button")
-local ButtonDialog = require("ui/widget/buttondialog")
-local Device = require("device")
-local Font = require("ui/font")
-local FrameContainer = require("ui/widget/container/framecontainer")
-local HorizontalGroup = require("ui/widget/horizontalgroup")
-local HorizontalSpan = require("ui/widget/horizontalspan")
-local InfoMessage = require("ui/widget/infomessage")
-local InputContainer = require("ui/widget/container/inputcontainer")
-local InputDialog = require("ui/widget/inputdialog")
-local TextBoxWidget = require("ui/widget/textboxwidget")
-local TextWidget = require("ui/widget/textwidget")
-local UIManager = require("ui/uimanager")
-local VerticalGroup = require("ui/widget/verticalgroup")
-local VerticalSpan = require("ui/widget/verticalspan")
-local WidgetContainer = require("ui/widget/container/widgetcontainer")
-local util = require("util")
-local _ = require("gettext")
-local Screen = Device.screen
+-- ============================================================================
+-- KOReader Tabata Timer Plugin
+-- Fullscreen countdown and interval timer designed for e-ink devices.
+-- ============================================================================
 
-local Parser = require("parser")
-local Updater = require("updater")
+-- KOReader UI and system modules
+local Blitbuffer = require("ffi/blitbuffer")             -- Framebuffer color constants
+local Button = require("ui/widget/button")                 -- Clickable/tappable button widget
+local ButtonDialog = require("ui/widget/buttondialog")     -- Modal dialog containing a list of buttons
+local Device = require("device")                           -- Device hardware abstraction (screen, battery, etc.)
+local Font = require("ui/font")                             -- FreeType font loader and cache
+local FrameContainer = require("ui/widget/container/framecontainer") -- Container with border, padding, and background
+local HorizontalGroup = require("ui/widget/horizontalgroup") -- Layout container arranging children horizontally
+local HorizontalSpan = require("ui/widget/horizontalspan")   -- Horizontal spacer
+local InfoMessage = require("ui/widget/infomessage")       -- Toast notification / message box
+local InputContainer = require("ui/widget/container/inputcontainer") -- Root container capable of intercepting touch/key events
+local InputDialog = require("ui/widget/inputdialog")       -- Modal text input dialog with on-screen keyboard
+local TextBoxWidget = require("ui/widget/textboxwidget")   -- Multi-line wrapped text widget
+local TextWidget = require("ui/widget/textwidget")         -- Single-line text widget
+local UIManager = require("ui/uimanager")                   -- Main KOReader UI event loop and window manager
+local VerticalGroup = require("ui/widget/verticalgroup")     -- Layout container arranging children vertically
+local VerticalSpan = require("ui/widget/verticalspan")       -- Vertical spacer
+local WidgetContainer = require("ui/widget/container/widgetcontainer") -- Base class for KOReader plugins
+local util = require("util")                               -- Utility helpers (file read/write, strings, etc.)
+local _ = require("gettext")                               -- Localization / translation function
+local Screen = Device.screen                               -- Screen dimensions and DPI scaling helper
 
-local TopContainer = require("ui/widget/container/topcontainer")
-local Geom = require("ui/geometry")
+-- Plugin-specific modules
+local Parser = require("parser")                           -- CSV parser for workout definition files
+local Updater = require("updater")                         -- Over-the-air GitHub updater module
 
+local TopContainer = require("ui/widget/container/topcontainer") -- Container aligning children to the top with fixed dimen
+local Geom = require("ui/geometry")                         -- Geometry rectangle (x, y, w, h)
+
+-- ----------------------------------------------------------------------------
+-- TabataTimerWidget: Fullscreen interactive timer view
+-- ----------------------------------------------------------------------------
 local TabataTimerWidget = InputContainer:extend{
     name = "TabataTimerWidget",
     covers_fullscreen = true,
 }
 
 function TabataTimerWidget:init()
-    self.width = Screen:getWidth()
-    self.height = Screen:getHeight()
-    self.dimen = Geom:new{ x = 0, y = 0, w = self.width, h = self.height }
-    self.plugin_path = self.plugin_path or (self.workouts_dir and self.workouts_dir:gsub("/workouts$", "")) or "."
-    self.workouts_dir = self.workouts_dir or (self.plugin_path and (self.plugin_path .. "/workouts")) or "workouts"
-    self.currentWorkoutName = self.currentWorkoutName or "tabata"
-    self.exercises = self.exercises or { { name = "No exercises", seconds = 0 } }
-    self.currentIndex = 1
-    self.timeLeft = self.exercises[self.currentIndex].seconds
-    self.paused = true
-    self.running = true
-    self.tick_scheduled = false
+    -- Screen geometry
+    self.width = Screen:getWidth()                           -- Full display width in pixels
+    self.height = Screen:getHeight()                         -- Full display height in pixels
+    self.dimen = Geom:new{ x = 0, y = 0, w = self.width, h = self.height } -- Container bounding box
 
+    -- Path configuration
+    self.plugin_path = self.plugin_path or (self.workouts_dir and self.workouts_dir:gsub("/workouts$", "")) or "." -- Root directory of plugin
+    self.workouts_dir = self.workouts_dir or (self.plugin_path and (self.plugin_path .. "/workouts")) or "workouts" -- Directory containing workout CSVs
+
+    -- Workout state
+    self.currentWorkoutName = self.currentWorkoutName or "tabata" -- Name of current workout routine (without .csv)
+    self.exercises = self.exercises or { { name = "No exercises", seconds = 0 } } -- Array of { name = string, seconds = number }
+    self.currentIndex = 1                                    -- 1-based index of the currently active exercise
+    self.timeLeft = self.exercises[self.currentIndex].seconds -- Remaining seconds for the active exercise
+
+    -- Timer execution flags
+    self.paused = true                                       -- Starts in paused state until user presses Start
+    self.running = true                                      -- Controls whether timer loop is active (set false on close)
+    self.tick_scheduled = false                              -- Flag indicating a 1-second timer tick is queued in UIManager
+
+    -- Build the UI widget tree
     self:buildLayout()
 end
 
+-- Converts an integer number of seconds into "MM:SS" format
 function TabataTimerWidget:formatTime(seconds)
     if not seconds or seconds < 0 then seconds = 0 end
     return string.format("%02d:%02d", math.floor(seconds / 60), seconds % 60)
 end
 
+-- Computes total remaining workout time across the current and all remaining exercises
 function TabataTimerWidget:getTotalTimeLeft()
     local total = self.timeLeft
     for i = self.currentIndex + 1, #self.exercises do
@@ -60,9 +80,14 @@ function TabataTimerWidget:getTotalTimeLeft()
     return total
 end
 
+-- Constructs the widget tree and calculates vertical spacing
 function TabataTimerWidget:buildLayout()
     local currentEx = self.exercises[self.currentIndex] or { name = "", seconds = 0 }
 
+    -- ------------------------------------------------------------------------
+    -- Top Navigation Bar
+    -- ------------------------------------------------------------------------
+    -- Button to exit the timer and return to KOReader
     self.closeButton = Button:new{
         text = "✕ Close",
         text_font_face = "cfont",
@@ -72,6 +97,7 @@ function TabataTimerWidget:buildLayout()
         end,
     }
 
+    -- Button to open the workout selection / management modal
     self.workoutsButton = Button:new{
         text = "Workouts",
         text_font_face = "cfont",
@@ -81,18 +107,23 @@ function TabataTimerWidget:buildLayout()
         end,
     }
 
+    -- Label displaying the current workout name next to the Workouts button (e.g. "(tabata)")
     self.workoutLabelWidget = TextWidget:new{
         text = "(" .. self.currentWorkoutName .. ")",
         face = Font:getFace("cfont", 22),
     }
 
-    local leadPadding = Screen:scaleBySize(10)
-    local spacing1 = Screen:scaleBySize(6)
-    local spacing2 = Screen:scaleBySize(8)
+    -- Top bar layout spacing & horizontal alignment
+    local leadPadding = Screen:scaleBySize(10)               -- Left margin padding
+    local spacing1 = Screen:scaleBySize(6)                  -- Gap between Close and Workouts button
+    local spacing2 = Screen:scaleBySize(8)                  -- Gap between Workouts button and workout label
     self.topBarLeadingSpan = HorizontalSpan:new{ width = leadPadding }
+
+    -- Calculate remaining width so the top bar spans across 94% of screen width cleanly
     local usedWidth = leadPadding + self.closeButton:getSize().w + self.workoutsButton:getSize().w + self.workoutLabelWidget:getSize().w + spacing1 + spacing2
     self.topBarTrailingSpan = HorizontalSpan:new{ width = math.max(0, math.floor(self.width * 0.94) - usedWidth) }
 
+    -- Group holding all top-bar items horizontally
     self.topBar = HorizontalGroup:new{
         align = "center",
         self.topBarLeadingSpan,
@@ -104,6 +135,10 @@ function TabataTimerWidget:buildLayout()
         self.topBarTrailingSpan,
     }
 
+    -- ------------------------------------------------------------------------
+    -- Middle Section: Exercise Title, Countdown Clocks, Controls
+    -- ------------------------------------------------------------------------
+    -- Current exercise indicator and name: "(1/10)\nPlank"
     self.titleWidget = TextBoxWidget:new{
         text = string.format("(%d/%d)\n%s", self.currentIndex, #self.exercises, currentEx.name),
         face = Font:getFace("cfont", 44),
@@ -112,38 +147,56 @@ function TabataTimerWidget:buildLayout()
         width = math.floor(self.width * 0.94),
     }
 
+    -- Main countdown timer ("00:30"): Uses custom font height/baseline to eliminate empty FreeType margins
+    local clockFace = Font:getFace("cfont", 155)
+    local _, clockAscender = clockFace.ftsize:getHeightAndAscender()
     self.clockWidget = TextWidget:new{
         text = self:formatTime(self.timeLeft),
-        face = Font:getFace("cfont", 155),
+        face = clockFace,
         bold = true,
+        padding = 0,
+        forced_height = math.floor(clockAscender * 0.84),
+        forced_baseline = math.floor(clockAscender * 0.80),
     }
 
+    -- Total remaining workout time ("Total left: 03:40")
     self.totalClockWidget = TextWidget:new{
         text = "Total left: " .. self:formatTime(self:getTotalTimeLeft()),
         face = Font:getFace("cfont", 30),
+        padding = 0,
     }
 
+    -- ------------------------------------------------------------------------
+    -- Upcoming Exercises Section
+    -- ------------------------------------------------------------------------
+    -- Pre-calculate maximum height of 8 upcoming lines to lock container height and avoid jitter
     local sampleUpcoming = TextBoxWidget:new{
         text = "Upcoming exercises:\n 99. Line 1 (30s)\n 99. Line 2 (30s)\n 99. Line 3 (30s)\n 99. Line 4 (30s)\n 99. Line 5 (30s)\n 99. Line 6 (30s)\n (+99 more exercises)\n",
-        face = Font:getFace("cfont", 26),
+        face = Font:getFace("cfont", 30),
         alignment = "center",
         width = math.floor(self.width * 0.94),
     }
-    self.upcomingMaxH = sampleUpcoming:getSize().h
+    self.upcomingMaxH = sampleUpcoming:getSize().h           -- Locked vertical height for upcoming list
     sampleUpcoming:free()
 
+    -- Live widget displaying next upcoming exercises
     self.upcomingTextWidget = TextBoxWidget:new{
         text = self:getUpcomingText(),
-        face = Font:getFace("cfont", 26),
+        face = Font:getFace("cfont", 30),
         alignment = "center",
         width = math.floor(self.width * 0.94),
     }
 
+    -- TopContainer locks upcoming text to fixed height, preventing layout jumps when items decrease
     self.upcomingContainer = TopContainer:new{
         dimen = Geom:new{ x = 0, y = 0, w = math.floor(self.width * 0.94), h = self.upcomingMaxH },
         self.upcomingTextWidget,
     }
 
+    -- ------------------------------------------------------------------------
+    -- Navigation & Playback Controls
+    -- ------------------------------------------------------------------------
+    -- Previous exercise button
     self.prevButton = Button:new{
         text = "⏮ Prev",
         text_font_face = "cfont",
@@ -153,6 +206,7 @@ function TabataTimerWidget:buildLayout()
         end,
     }
 
+    -- Pre-calculate maximum button width for Start/Pause/Resume states so button size remains static
     local sampleResume = Button:new{ text = "▶ Resume", text_font_face = "cfont", text_font_size = 30 }
     local samplePause = Button:new{ text = "⏸ Pause", text_font_face = "cfont", text_font_size = 30 }
     local sampleStart = Button:new{ text = "▶ Start", text_font_face = "cfont", text_font_size = 30 }
@@ -161,6 +215,7 @@ function TabataTimerWidget:buildLayout()
     samplePause:free()
     sampleStart:free()
 
+    -- Start / Pause / Resume toggle button
     self.playPauseButton = Button:new{
         text = "▶ Start",
         text_font_face = "cfont",
@@ -171,6 +226,7 @@ function TabataTimerWidget:buildLayout()
         end,
     }
 
+    -- Next exercise button
     self.nextButton = Button:new{
         text = "Next ⏭",
         text_font_face = "cfont",
@@ -180,6 +236,7 @@ function TabataTimerWidget:buildLayout()
         end,
     }
 
+    -- Horizontal group holding Prev, Start/Pause, and Next buttons
     self.navButtonGroup = HorizontalGroup:new{
         align = "center",
         self.prevButton,
@@ -189,8 +246,7 @@ function TabataTimerWidget:buildLayout()
         self.nextButton,
     }
 
-    self.topMarginSpan = VerticalSpan:new{ width = Screen:scaleBySize(4) }
-
+    -- Vertical group holding title, timer, total clock, and nav buttons
     self.middleGroup = VerticalGroup:new{
         align = "center",
         self.titleWidget,
@@ -201,12 +257,19 @@ function TabataTimerWidget:buildLayout()
         self.navButtonGroup,
     }
 
+    -- ------------------------------------------------------------------------
+    -- Dynamic Spacing and Main Root Layout Assembly
+    -- ------------------------------------------------------------------------
+    self.topMarginSpan = VerticalSpan:new{ width = Screen:scaleBySize(4) }
+
+    -- Calculate available vertical space and distribute between top and bottom sections
     local usedH = self.topMarginSpan.width + self.topBar:getSize().h + self.middleGroup:getSize().h + self.upcomingContainer:getSize().h
     local remainingH = math.max(0, self.height - usedH)
 
     self.space1Span = VerticalSpan:new{ width = math.max(Screen:scaleBySize(2), math.floor(remainingH * 0.35)) }
     self.space2Span = VerticalSpan:new{ width = math.max(Screen:scaleBySize(4), math.floor(remainingH * 0.40)) }
 
+    -- Full vertical layout group
     self.mainGroup = VerticalGroup:new{
         align = "center",
         self.topMarginSpan,
@@ -217,6 +280,7 @@ function TabataTimerWidget:buildLayout()
         self.upcomingContainer,
     }
 
+    -- Root frame container with white background
     self.frame = FrameContainer:new{
         width = self.width,
         height = self.height,
@@ -230,14 +294,16 @@ function TabataTimerWidget:buildLayout()
     self[1] = self.frame
 end
 
+-- Generates formatted multi-line text listing upcoming exercises (up to 6 items previewed)
 function TabataTimerWidget:getUpcomingText()
     local text = "Upcoming exercises:\n"
-    local count = 0
+    local count = 0                                          -- Number of upcoming exercises added to preview
     for i = self.currentIndex + 1, #self.exercises do
         local ex = self.exercises[i]
         text = text .. " " .. i .. ". " .. ex.name .. " (" .. ex.seconds .. "s)\n"
         count = count + 1
         if count >= 6 then
+            -- If more exercises exist beyond the 6 preview lines, append count summary
             if #self.exercises > i then
                 text = text .. " (+" .. (#self.exercises - i) .. " more exercises)\n"
             end
@@ -250,6 +316,7 @@ function TabataTimerWidget:getUpcomingText()
     return text
 end
 
+-- Toggles between running and paused states
 function TabataTimerWidget:togglePlayPause()
     self.paused = not self.paused
     if not self.paused then
@@ -265,6 +332,7 @@ function TabataTimerWidget:togglePlayPause()
     UIManager:setDirty(self, "ui")
 end
 
+-- Jumps back to previous exercise interval
 function TabataTimerWidget:onPrev()
     if self.currentIndex > 1 then
         self.currentIndex = self.currentIndex - 1
@@ -273,6 +341,7 @@ function TabataTimerWidget:onPrev()
     self:updateDisplay()
 end
 
+-- Skips forward to next exercise interval or ends workout if on final exercise
 function TabataTimerWidget:onNext()
     if self.currentIndex < #self.exercises then
         self.currentIndex = self.currentIndex + 1
@@ -287,6 +356,7 @@ function TabataTimerWidget:onNext()
     end
 end
 
+-- Updates all text widgets (title, countdown, total clock, upcoming list) and marks UI dirty
 function TabataTimerWidget:updateDisplay()
     if not self.running then return end
     local currentEx = self.exercises[self.currentIndex]
@@ -301,6 +371,7 @@ function TabataTimerWidget:updateDisplay()
     UIManager:setDirty(self, "ui")
 end
 
+-- Schedules recurring 1-second countdown ticks via UIManager
 function TabataTimerWidget:scheduleTick()
     if not self.running or self.paused then return end
     self.tick_scheduled = true
@@ -310,6 +381,7 @@ function TabataTimerWidget:scheduleTick()
         if not self.paused then
             self.timeLeft = self.timeLeft - 1
             if self.timeLeft < 0 then
+                -- Move to next exercise when interval reaches 0
                 self.currentIndex = self.currentIndex + 1
                 if self.currentIndex > #self.exercises then
                     self:onClose()
@@ -328,6 +400,7 @@ function TabataTimerWidget:scheduleTick()
     end)
 end
 
+-- Scans workouts_dir for all available .csv workout files
 function TabataTimerWidget:getAvailableWorkouts()
     local ok, lfs = pcall(require, "libs/libkoreader-lfs")
     if not ok then
@@ -347,9 +420,11 @@ function TabataTimerWidget:getAvailableWorkouts()
     return files
 end
 
+-- Displays the "Select Workout" modal dialog with options to Select, Edit, Rename, Create New, and Check Updates
 function TabataTimerWidget:showWorkoutsDialog()
-    local files = self:getAvailableWorkouts()
+    local files = self:getAvailableWorkouts()                 -- List of *.csv filenames in workouts_dir
 
+    -- Measure button widths for "✏ Edit" and "Rename" to keep columns uniform
     local sampleEdit = Button:new{ text = "✏ Edit" }
     local sampleRename = Button:new{ text = _("Rename") }
     local edit_width = sampleEdit:getSize().w + Screen:scaleBySize(8)
@@ -358,6 +433,7 @@ function TabataTimerWidget:showWorkoutsDialog()
     sampleRename:free()
 
     local buttons = {}
+    -- Add a row for each workout routine: [Workout Name] | [✏ Edit] | [Rename]
     for i, file in ipairs(files) do
         local display_name = file:gsub("%.[cC][sS][vV]$", "")
         local filepath = self.workouts_dir .. "/" .. file
@@ -396,6 +472,8 @@ function TabataTimerWidget:showWorkoutsDialog()
             },
         })
     end
+
+    -- Button to create a new workout CSV
     table.insert(buttons, {
         {
             text = _("➕ New workout"),
@@ -408,6 +486,8 @@ function TabataTimerWidget:showWorkoutsDialog()
             end,
         }
     })
+
+    -- Button to check GitHub for updates over Wi-Fi
     table.insert(buttons, {
         {
             text = _("Check for updates"),
@@ -422,6 +502,8 @@ function TabataTimerWidget:showWorkoutsDialog()
             end,
         }
     })
+
+    -- Button to dismiss the dialog
     table.insert(buttons, {
         {
             text = _("Cancel"),
@@ -441,6 +523,7 @@ function TabataTimerWidget:showWorkoutsDialog()
     UIManager:show(self.workout_dialog)
 end
 
+-- Prompts user for a new name and renames the workout .csv file on disk
 function TabataTimerWidget:renameWorkout(filepath, old_display_name)
     local rename_dialog
     rename_dialog = InputDialog:new{
@@ -464,6 +547,7 @@ function TabataTimerWidget:renameWorkout(filepath, old_display_name)
                     is_enter_default = true,
                     callback = function()
                         local raw_name = rename_dialog:getInputText() or ""
+                        -- Sanitize input: trim whitespace, strip .csv suffix and path separators
                         local clean_name = raw_name:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%.[cC][sS][vV]$", "")
                         clean_name = clean_name:gsub("[\\/]", "")
                         if clean_name == "" then
@@ -491,6 +575,7 @@ function TabataTimerWidget:renameWorkout(filepath, old_display_name)
                             return
                         end
 
+                        -- Rename file on filesystem
                         local ok, err = os.rename(filepath, new_filepath)
                         if not ok then
                             UIManager:show(InfoMessage:new{
@@ -500,6 +585,7 @@ function TabataTimerWidget:renameWorkout(filepath, old_display_name)
                             return
                         end
 
+                        -- If currently active workout was renamed, update top bar label
                         if self.currentWorkoutName == old_display_name then
                             self.currentWorkoutName = clean_name
                             self.workoutLabelWidget:setText("(" .. self.currentWorkoutName .. ")")
@@ -529,6 +615,7 @@ function TabataTimerWidget:renameWorkout(filepath, old_display_name)
     rename_dialog:onShowKeyboard()
 end
 
+-- Prompts for a workout name, generates a starter CSV template, and opens the editor
 function TabataTimerWidget:newWorkout()
     local name_dialog
     name_dialog = InputDialog:new{
@@ -564,6 +651,7 @@ function TabataTimerWidget:newWorkout()
                         local filepath = self.workouts_dir .. "/" .. clean_name .. ".csv"
                         local existing = util.readFromFile(filepath, "rb")
                         if not existing or existing == "" then
+                            -- Create default template if file does not exist yet
                             local template = "# Exercise,Seconds\nPlank,30\nRest,10\nPush-ups,30\nRest,10\n"
                             util.writeToFile(template, filepath)
                         end
@@ -578,6 +666,7 @@ function TabataTimerWidget:newWorkout()
     name_dialog:onShowKeyboard()
 end
 
+-- Opens full-screen text editor to modify a workout CSV directly on-device
 function TabataTimerWidget:editWorkout(filepath, display_name)
     local content = util.readFromFile(filepath, "rb") or ""
     self.editor_dialog = InputDialog:new{
@@ -605,6 +694,7 @@ function TabataTimerWidget:editWorkout(filepath, display_name)
     UIManager:show(self.editor_dialog)
 end
 
+-- Loads a workout CSV file, resets index/timer, and updates the display
 function TabataTimerWidget:loadWorkout(filepath, display_name)
     local workouts, err = Parser.readCSV(filepath)
     if not workouts or #workouts == 0 then
@@ -622,6 +712,7 @@ function TabataTimerWidget:loadWorkout(filepath, display_name)
     self.currentIndex = 1
     self.timeLeft = self.exercises[self.currentIndex].seconds
 
+    -- Recalculate top bar widths
     local leadPadding = self.topBarLeadingSpan and self.topBarLeadingSpan.width or Screen:scaleBySize(10)
     local spacing1 = Screen:scaleBySize(6)
     local spacing2 = Screen:scaleBySize(8)
@@ -634,6 +725,7 @@ function TabataTimerWidget:loadWorkout(filepath, display_name)
     self:updateDisplay()
 end
 
+-- Closes the timer widget and cleans up all active modal dialogs
 function TabataTimerWidget:onClose()
     self.running = false
     self.paused = true
@@ -657,6 +749,9 @@ function TabataTimerWidget:onClose()
     return true
 end
 
+-- ----------------------------------------------------------------------------
+-- TabataTimerPlugin: KOReader Plugin Lifecycle & Menu Registration
+-- ----------------------------------------------------------------------------
 local TabataTimerPlugin = WidgetContainer:extend{
     name = "tabatatimer",
     is_doc_only = false,
