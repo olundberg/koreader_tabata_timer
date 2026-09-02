@@ -1,4 +1,4 @@
-Work,10
+Work,10  # 7
 Rest,3
 Work,10
 Rest,3
@@ -11,8 +11,10 @@ Rest,3
 Work,10
 Rest,3
 Work,10
+
 REST,30
-Work,10
+
+Work,10  # 5
 Rest,3
 Work,10
 Rest,3
@@ -22,8 +24,10 @@ Work,10
 Rest,3
 Work,10
 Rest,3
+
 REST,30
-Work,10
+
+Work,10  # 3
 Rest,3
 Work,10
 Rest,3
